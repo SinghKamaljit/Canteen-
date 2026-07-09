@@ -382,11 +382,22 @@ function handleScanResult(text){
    or the occasional case of scanning a screenshot/photo of a card
    sent to a staff member for a discounted/free item) ---------- */
 
-function imageToCanvas(img){
+function canvasFromImageCapped(img, maxDim){
+  // Draws the source image straight into a capped-size canvas in one
+  // step — never allocates a full native-resolution canvas first.
+  // A modern phone photo can be 3000-4000px+ on a side; skipping that
+  // huge intermediate allocation is the main memory-safety win here.
+  const nw = img.naturalWidth || img.width;
+  const nh = img.naturalHeight || img.height;
+  let w = nw, h = nh;
+  if(Math.max(w, h) > maxDim){
+    const scale = maxDim / Math.max(w, h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+  }
   const c = document.createElement('canvas');
-  c.width = img.naturalWidth;
-  c.height = img.naturalHeight;
-  c.getContext('2d').drawImage(img, 0, 0);
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(img, 0, 0, nw, nh, 0, 0, w, h);
   return c;
 }
 
@@ -412,10 +423,17 @@ function capResolution(canvas, maxDim){
 }
 
 function decodeCanvasForQR(canvas){
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-  return result && result.data ? result.data : null;
+  try{
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+    return result && result.data ? result.data : null;
+  }catch(e){
+    // One problematic tile (odd size, memory hiccup, etc.) should not
+    // abort the whole multi-tile search — just skip it and keep going.
+    console.error('QR tile decode failed:', e);
+    return null;
+  }
 }
 
 // Builds an NxN grid of overlapping tile rectangles covering W x H.
@@ -450,8 +468,7 @@ function buildGridTiles(W, H, n, overlapFrac){
 const GALLERY_SCAN_WORKING_DIM = 1800;
 
 function scanImageForQR(img){
-  const native = imageToCanvas(img);
-  const working = capResolution(native, GALLERY_SCAN_WORKING_DIM);
+  const working = canvasFromImageCapped(img, GALLERY_SCAN_WORKING_DIM);
 
   let text = decodeCanvasForQR(working);
   if(text) return text;
