@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Service Counter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<style>
+  :root{
+    --navy:#0b2545;
+    --navy-2:#13315c;
+    --gold:#c9a227;
+    --gold-2:#e0bc4a;
+    --paper:#f7f5ef;
+    --ink:#12181f;
+    --line:#d9d4c4;
+    --danger:#a3372f;
+    --danger-bg:#fbeceb;
+    --ok:#1e7a4c;
+    --ok-bg:#eaf6ef;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding-bottom:50px;
+  }
+  header{
+    background:linear-gradient(135deg,var(--navy),var(--navy-2));
+    color:#fff;
+    padding:18px 16px 16px;
+    border-bottom:4px solid var(--gold);
+    position:sticky; top:0; z-index:20;
+  }
+  header .row{display:flex;justify-content:space-between;align-items:center;}
+  header h1{margin:0;font-size:1.15rem;}
+  header p{margin:2px 0 0;font-size:0.78rem;color:#c9d3e0;}
+  .icon-btn{
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.3);
+    color:#fff;
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:0.8rem;
+  }
+
+  main{max-width:480px;margin:0 auto;padding:14px;}
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:0 2px 10px rgba(11,37,69,0.06);
+  }
+  .panel h2{
+    font-size:0.85rem;
+    margin:0 0 10px;
+    color:var(--navy);
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+  }
+  label{display:block;font-size:0.8rem;font-weight:600;color:var(--navy-2);margin:8px 0 4px;}
+  input, select{
+    width:100%;
+    padding:12px 10px;
+    font-size:1rem;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:#fdfcf9;
+  }
+  input:focus, select:focus{outline:none;border-color:var(--gold);}
+  .btn{
+    display:inline-block;width:100%;padding:13px;margin-top:12px;
+    font-size:1rem;font-weight:700;border:none;border-radius:8px;
+    background:var(--navy);color:#fff;letter-spacing:0.3px;
+  }
+  .btn:active{background:var(--navy-2);}
+  .btn.gold{background:var(--gold);color:var(--navy);}
+  .btn.secondary{background:#fff;color:var(--navy);border:1.5px solid var(--navy);}
+  .btn.danger{background:var(--danger);color:#fff;}
+  .row{display:flex;gap:10px;}
+  .row .btn{flex:1;margin-top:12px;}
+
+  #video{
+    width:100%;
+    border-radius:10px;
+    background:#000;
+    display:none;
+  }
+  .scan-status{
+    font-size:0.78rem;
+    color:#777;
+    text-align:center;
+    margin-top:8px;
+  }
+
+  .member-card{
+    background:linear-gradient(135deg,var(--navy),var(--navy-2));
+    color:#fff;
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:14px;
+    border-bottom:3px solid var(--gold);
+  }
+  .member-card .name{font-size:1.15rem;font-weight:700;}
+  .member-card .meta{font-size:0.82rem;color:#c9d3e0;margin-top:2px;}
+  .member-card .balance-wrap{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    margin-top:14px;
+  }
+  .member-card .balance-label{font-size:0.72rem;color:var(--gold-2);text-transform:uppercase;letter-spacing:0.5px;}
+  .member-card .balance{font-size:2rem;font-weight:800;}
+  .member-card.low{border-bottom-color:var(--danger);}
+  .member-card.low .balance{color:#ffb3ac;}
+
+  .item-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .item-btn{
+    background:#fff;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    padding:12px 8px;
+    text-align:left;
+  }
+  .item-btn .iname{font-weight:700;font-size:0.9rem;color:var(--ink);}
+  .item-btn .iprice{font-size:0.82rem;color:var(--navy-2);margin-top:2px;}
+  .item-btn:active{background:var(--paper);}
+
+  .txn{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 2px;border-bottom:1px solid var(--line);font-size:0.85rem;
+  }
+  .txn:last-child{border-bottom:none;}
+  .txn .meta{font-size:0.74rem;color:#888;}
+  .txn .amt.pos{color:var(--ok);font-weight:700;}
+  .txn .amt.neg{color:var(--danger);font-weight:700;}
+  .empty-note{text-align:center;color:#999;font-size:0.85rem;padding:12px 0;}
+
+  .rate-row{
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  }
+  .rate-row input[type=text]{flex:2;}
+  .rate-row input[type=number]{flex:1;}
+  .rate-row button{
+    background:none;border:1px solid var(--danger);color:var(--danger);
+    border-radius:6px;padding:8px 10px;font-size:0.8rem;flex-shrink:0;
+  }
+
+  .modal-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(11,37,69,0.55);
+    z-index:50;align-items:flex-end;justify-content:center;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:#fff;border-radius:16px 16px 0 0;
+    width:100%;max-width:480px;padding:18px;
+    max-height:85vh;overflow-y:auto;
+  }
+  .modal h2{margin-top:0;}
+  .close-x{
+    float:right;background:none;border:none;font-size:1.3rem;color:#888;line-height:1;
+  }
+
+  .banner{
+    padding:10px 12px;border-radius:8px;font-size:0.85rem;margin-bottom:12px;
+  }
+  .banner.ok{background:var(--ok-bg);color:var(--ok);}
+  .banner.err{background:var(--danger-bg);color:var(--danger);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <div>
+      <h1>Service Counter</h1>
+      <p>Scan · Top-up · Deduct</p>
+    </div>
+    <button class="icon-btn" onclick="openRates()">Rates</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="panel">
+    <h2>Find Member</h2>
+    <button class="btn gold" id="scanBtn" onclick="toggleScanner()">Start Camera Scan</button>
+    <video id="video" playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="scan-status" id="scanStatus"></div>
+
+    <label for="manualId">Or enter Membership Number</label>
+    <div class="row" style="margin-top:0;">
+      <input id="manualId" type="text" placeholder="e.g. M-001" autocomplete="off" style="margin-top:8px;">
+    </div>
+    <button class="btn secondary" onclick="manualLookup()">Find Member</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <div id="memberSection" style="display:none;">
+
+    <div class="member-card" id="memberCard">
+      <div class="name" id="mName">—</div>
+      <div class="meta" id="mMeta">—</div>
+      <div class="balance-wrap">
+        <div>
+          <div class="balance-label">Balance</div>
+          <div class="balance" id="mBalance">₹0</div>
+        </div>
+        <button class="icon-btn" onclick="sendBalanceSms()">📲 SMS Balance</button>
+      </div>
+    </div>
+
+    <div class="panel" id="smsPanel" style="display:none;">
+      <h2>Send Receipt SMS</h2>
+      <div id="smsPreview" style="font-size:0.85rem;color:#444;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:6px;"></div>
+      <button class="btn gold" id="smsSendBtn" onclick="sendBalanceSms()">📲 Send SMS</button>
+    </div>
+
+    <div class="panel">
+      <h2>Top Up</h2>
+      <div class="row" style="margin-top:0;">
+        <input id="topupAmt" type="number" min="1" placeholder="Amount e.g. 2000" style="margin-top:0;">
+      </div>
+      <button class="btn" onclick="doTopup()">Add Balance</button>
+    </div>
+
+    <div class="panel">
+      <h2>Deduct — Tap Item</h2>
+      <div class="item-grid" id="itemGrid"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Transaction History — This Member</h2>
+      <div id="txnList"><div class="empty-note">No transactions yet</div></div>
+      <button class="btn secondary" onclick="exportMemberCSV()">Export This Member's CSV</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Reports & Backup</h2>
+    <button class="btn secondary" onclick="exportAllBalancesCSV()">Export All Balances (CSV)</button>
+    <button class="btn secondary" onclick="exportFullLogCSV()">Export Full Transaction Log (CSV)</button>
+  </div>
+
+</main>
+
+<!-- Rates Modal -->
+<div class="modal-backdrop" id="ratesModal">
+  <div class="modal">
+    <button class="close-x" onclick="closeRates()">✕</button>
+    <h2>Item Rates</h2>
+    <div id="rateRows"></div>
+    <div class="row" style="margin-top:4px;">
+      <input id="newItemName" type="text" placeholder="New item name">
+      <input id="newItemPrice" type="number" placeholder="₹" style="max-width:90px;">
+    </div>
+    <button class="btn secondary" onclick="addRateItem()">Add Item</button>
+    <button class="btn gold" onclick="closeRates()">Done</button>
+  </div>
+</div>
+
+<script>
+const MEMBERS_KEY = 'Counter_members';
+const TXN_KEY = 'Counter_transactions';
+const RATES_KEY = 'Counter_rates';
+const LOW_BALANCE_THRESHOLD = 20;
+const COUNTER_NAME = 'Service Counter'; // edit this to your association/venue name
+
+const DEFAULT_RATES = {
+  'Tea': 10,
+  'Coffee': 15,
+  'Samosa': 15,
+  'Mathi': 10,
+  'Cold Drink': 20,
+  'Lassi': 25
+};
+
+let currentMember = null; // mno of currently loaded member
+let lastTxn = null; // {mno, desc, amount, balanceAfter, timestamp}
+let stream = null;
+let scanning = false;
+let rafId = null;
+
+/* ---------- Storage helpers ---------- */
+function loadMembers(){ try{ return JSON.parse(localStorage.getItem(MEMBERS_KEY)) || {}; }catch(e){ return {}; } }
+function saveMembers(obj){ localStorage.setItem(MEMBERS_KEY, JSON.stringify(obj)); }
+
+function loadTxns(){ try{ return JSON.parse(localStorage.getItem(TXN_KEY)) || []; }catch(e){ return []; } }
+function saveTxns(arr){ localStorage.setItem(TXN_KEY, JSON.stringify(arr)); }
+
+function loadRates(){
+  try{
+    const r = JSON.parse(localStorage.getItem(RATES_KEY));
+    if(r && Object.keys(r).length) return r;
+  }catch(e){}
+  saveRates(DEFAULT_RATES);
+  return {...DEFAULT_RATES};
+}
+function saveRates(obj){ localStorage.setItem(RATES_KEY, JSON.stringify(obj)); }
+
+/* ---------- Banner ---------- */
+function showBanner(msg, type){
+  const el = document.getElementById('banner');
+  el.innerHTML = `<div class="banner ${type}">${escapeHtml(msg)}</div>`;
+  setTimeout(()=>{ el.innerHTML=''; }, 3500);
+}
+
+/* ---------- Camera Scanner ---------- */
+async function toggleScanner(){
+  if(scanning){ stopScanner(); return; }
+  const video = document.getElementById('video');
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = stream;
+    video.style.display = 'block';
+    await video.play();
+    scanning = true;
+    document.getElementById('scanBtn').textContent = 'Stop Camera';
+    document.getElementById('scanStatus').textContent = 'Point camera at QR code...';
+    scanLoop();
+  }catch(err){
+    showBanner('Camera access denied or unavailable. Use manual entry below.', 'err');
+  }
+}
+
+function stopScanner(){
+  scanning = false;
+  if(rafId) cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  const video = document.getElementById('video');
+  video.style.display = 'none';
+  document.getElementById('scanBtn').textContent = 'Start Camera Scan';
+  document.getElementById('scanStatus').textContent = '';
+}
+
+function scanLoop(){
+  if(!scanning) return;
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    if(code && code.data){
+      handleScanResult(code.data);
+      stopScanner();
+      return;
+    }
+  }
+  rafId = requestAnimationFrame(scanLoop);
+}
+
+function handleScanResult(text){
+  // Expected format: MNO|NAME|PHONE
+  const parts = text.split('|');
+  const mno = (parts[0]||'').trim();
+  const name = (parts[1]||'').trim();
+  const phone = (parts[2]||'').trim();
+  if(!mno){
+    showBanner('QR code not recognised as a member card.', 'err');
+    return;
+  }
+  loadOrCreateMember(mno, name, phone);
+}
+
+/* ---------- Manual entry ---------- */
+function manualLookup(){
+  const mno = document.getElementById('manualId').value.trim();
+  if(!mno){ showBanner('Enter a membership number.', 'err'); return; }
+  loadOrCreateMember(mno, '', '');
+}
+
+/* ---------- Member load / create ---------- */
+function loadOrCreateMember(mno, name, phone){
+  let members = loadMembers();
+  if(!members[mno]){
+    members[mno] = {
+      name: name || '(Unnamed)',
+      phone: phone || '',
+      balance: 0,
+      createdAt: new Date().toISOString()
+    };
+    saveMembers(members);
+    showBanner(`New member record created for ${mno}.`, 'ok');
+  } else {
+    // refresh name/phone if scan supplied better info and existing was blank
+    let changed = false;
+    if(name && members[mno].name === '(Unnamed)'){ members[mno].name = name; changed = true; }
+    if(phone && !members[mno].phone){ members[mno].phone = phone; changed = true; }
+    if(changed) saveMembers(members);
+  }
+  if(currentMember !== mno){ lastTxn = null; } // switching members clears the pending SMS receipt
+  currentMember = mno;
+  document.getElementById('manualId').value = '';
+  renderMember();
+}
+
+/* ---------- Render member card + items + history ---------- */
+function renderMember(){
+  const members = loadMembers();
+  const m = members[currentMember];
+  if(!m){ document.getElementById('memberSection').style.display='none'; return; }
+
+  document.getElementById('memberSection').style.display = 'block';
+  document.getElementById('mName').textContent = m.name;
+  document.getElementById('mMeta').textContent = `ID: ${currentMember}${m.phone ? ' · ' + m.phone : ''}`;
+  document.getElementById('mBalance').textContent = `₹${m.balance}`;
+
+  const card = document.getElementById('memberCard');
+  card.classList.toggle('low', m.balance < LOW_BALANCE_THRESHOLD);
+
+  renderItemGrid();
+  renderTxnHistory();
+  renderSmsAction();
+}
+
+function renderItemGrid(){
+  const rates = loadRates();
+  const grid = document.getElementById('itemGrid');
+  grid.innerHTML = Object.entries(rates).map(([item, price]) => `
+    <button class="item-btn" onclick="doDeduct('${escapeAttr(item)}', ${Number(price)})">
+      <div class="iname">${escapeHtml(item)}</div>
+      <div class="iprice">₹${price}</div>
+    </button>
+  `).join('');
+}
+
+function renderTxnHistory(){
+  const txns = loadTxns().filter(t => t.mno === currentMember).slice().reverse();
+  const el = document.getElementById('txnList');
+  if(txns.length === 0){
+    el.innerHTML = '<div class="empty-note">No transactions yet</div>';
+    return;
+  }
+  el.innerHTML = txns.slice(0, 30).map(t => `
+    <div class="txn">
+      <div>
+        <div>${escapeHtml(t.desc)}</div>
+        <div class="meta">${formatTime(t.timestamp)}</div>
+      </div>
+      <div class="amt ${t.amount >= 0 ? 'pos' : 'neg'}">${t.amount >= 0 ? '+' : ''}₹${t.amount} <span style="color:#999;font-weight:400;">→ ₹${t.balanceAfter}</span></div>
+    </div>
+  `).join('');
+}
+
+/* ---------- Top-up ---------- */
+function doTopup(){
+  const amtInput = document.getElementById('topupAmt');
+  const amt = Number(amtInput.value);
+  if(!amt || amt <= 0){ showBanner('Enter a valid top-up amount.', 'err'); return; }
+
+  let members = loadMembers();
+  const m = members[currentMember];
+  m.balance = Math.round((m.balance + amt) * 100) / 100;
+  saveMembers(members);
+
+  logTxn(currentMember, `Top-up`, amt, m.balance);
+  amtInput.value = '';
+  showBanner(`₹${amt} added. New balance ₹${m.balance}.`, 'ok');
+  renderMember();
+}
+
+/* ---------- Deduct ---------- */
+function doDeduct(itemName, price){
+  let members = loadMembers();
+  const m = members[currentMember];
+  if(m.balance < price){
+    showBanner(`Insufficient balance for ${itemName} (₹${price}). Current balance ₹${m.balance}.`, 'err');
+    return;
+  }
+  m.balance = Math.round((m.balance - price) * 100) / 100;
+  saveMembers(members);
+  logTxn(currentMember, itemName, -price, m.balance);
+  showBanner(`${itemName} — ₹${price} deducted. Balance ₹${m.balance}.`, 'ok');
+  renderMember();
+}
+
+function logTxn(mno, desc, amount, balanceAfter){
+  const txns = loadTxns();
+  const entry = {
+    id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    mno, desc, amount, balanceAfter,
+    timestamp: new Date().toISOString()
+  };
+  txns.push(entry);
+  saveTxns(txns);
+  lastTxn = entry;
+  renderSmsAction();
+}
+
+/* ---------- SMS ---------- */
+function buildSmsText(m, mno, txn){
+  // Balance first and boldest — most important figure, kept near the front.
+  let msg = `${COUNTER_NAME}: Bal Rs${m.balance}.`;
+  if(txn){
+    const line = txn.amount >= 0
+      ? `${txn.desc} +Rs${txn.amount}.`
+      : `${txn.desc} -Rs${Math.abs(txn.amount)}.`;
+    msg = `${COUNTER_NAME}: Bal Rs${m.balance}. (${line})`;
+  }
+  msg += ` -${shortTime()}`;
+  return msg;
+}
+
+function shortTime(){
+  const d = new Date();
+  return d.toLocaleString([], {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+}
+
+function smsHref(phone, text){
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const sep = isIOS ? '&' : '?';
+  return `sms:${phone}${sep}body=${encodeURIComponent(text)}`;
+}
+
+function sendBalanceSms(){
+  const members = loadMembers();
+  const m = members[currentMember];
+  if(!m || !m.phone){ showBanner('No phone number on file for this member.', 'err'); return; }
+  const txn = (lastTxn && lastTxn.mno === currentMember) ? lastTxn : null;
+  const text = buildSmsText(m, currentMember, txn);
+  window.location.href = smsHref(m.phone, text);
+}
+
+function renderSmsAction(){
+  const el = document.getElementById('smsPanel');
+  if(!el) return;
+  const members = loadMembers();
+  const m = members[currentMember];
+  if(!m || !lastTxn || lastTxn.mno !== currentMember){
+    el.style.display = 'none';
+    return;
+  }
+  const text = buildSmsText(m, currentMember, lastTxn);
+  document.getElementById('smsPreview').textContent = text;
+  el.style.display = 'block';
+  if(!m.phone){
+    document.getElementById('smsSendBtn').disabled = true;
+    document.getElementById('smsSendBtn').textContent = 'No phone number on file';
+  } else {
+    document.getElementById('smsSendBtn').disabled = false;
+    document.getElementById('smsSendBtn').textContent = '📲 Send SMS';
+  }
+}
+
+/* ---------- Rates modal ---------- */
+function openRates(){
+  renderRateRows();
+  document.getElementById('ratesModal').classList.add('open');
+}
+function closeRates(){
+  document.getElementById('ratesModal').classList.remove('open');
+  if(currentMember) renderItemGrid();
+}
+function renderRateRows(){
+  const rates = loadRates();
+  const el = document.getElementById('rateRows');
+  el.innerHTML = Object.entries(rates).map(([item, price]) => `
+    <div class="rate-row">
+      <input type="text" value="${escapeAttr(item)}" onchange="renameRateItem('${escapeAttr(item)}', this.value)">
+      <input type="number" value="${price}" onchange="updateRatePrice('${escapeAttr(item)}', this.value)">
+      <button onclick="removeRateItem('${escapeAttr(item)}')">Del</button>
+    </div>
+  `).join('');
+}
+function updateRatePrice(item, value){
+  const rates = loadRates();
+  if(rates[item] === undefined) return;
+  rates[item] = Number(value) || 0;
+  saveRates(rates);
+}
+function renameRateItem(oldName, newName){
+  newName = newName.trim();
+  if(!newName || newName === oldName) return;
+  const rates = loadRates();
+  const price = rates[oldName];
+  delete rates[oldName];
+  rates[newName] = price;
+  saveRates(rates);
+  renderRateRows();
+}
+function removeRateItem(item){
+  if(!confirm(`Remove "${item}" from the menu?`)) return;
+  const rates = loadRates();
+  delete rates[item];
+  saveRates(rates);
+  renderRateRows();
+}
+function addRateItem(){
+  const nameEl = document.getElementById('newItemName');
+  const priceEl = document.getElementById('newItemPrice');
+  const name = nameEl.value.trim();
+  const price = Number(priceEl.value);
+  if(!name || !price){ alert('Enter item name and price.'); return; }
+  const rates = loadRates();
+  rates[name] = price;
+  saveRates(rates);
+  nameEl.value=''; priceEl.value='';
+  renderRateRows();
+}
+
+/* ---------- Exports ---------- */
+function exportMemberCSV(){
+  if(!currentMember) return;
+  const members = loadMembers();
+  const m = members[currentMember];
+  const txns = loadTxns().filter(t => t.mno === currentMember);
+  let csv = `Member,${csvSafe(m.name)}\nID,${csvSafe(currentMember)}\nPhone,${csvSafe(m.phone)}\nCurrent Balance,${m.balance}\n\n`;
+  csv += 'Timestamp,Description,Amount,Balance After\n';
+  txns.forEach(t=>{
+    csv += `${csvSafe(t.timestamp)},${csvSafe(t.desc)},${t.amount},${t.balanceAfter}\n`;
+  });
+  downloadCSV(csv, `${currentMember}_statement_${dateStamp()}.csv`);
+}
+
+function exportAllBalancesCSV(){
+  const members = loadMembers();
+  const ids = Object.keys(members);
+  if(ids.length === 0){ alert('No members yet.'); return; }
+  let csv = 'Membership Number,Name,Phone,Balance\n';
+  ids.forEach(mno=>{
+    const m = members[mno];
+    csv += `${csvSafe(mno)},${csvSafe(m.name)},${csvSafe(m.phone)},${m.balance}\n`;
+  });
+  downloadCSV(csv, `all_balances_${dateStamp()}.csv`);
+}
+
+function exportFullLogCSV(){
+  const txns = loadTxns();
+  if(txns.length === 0){ alert('No transactions recorded yet.'); return; }
+  const members = loadMembers();
+  let csv = 'Timestamp,Membership Number,Name,Description,Amount,Balance After\n';
+  txns.forEach(t=>{
+    const name = members[t.mno] ? members[t.mno].name : '';
+    csv += `${csvSafe(t.timestamp)},${csvSafe(t.mno)},${csvSafe(name)},${csvSafe(t.desc)},${t.amount},${t.balanceAfter}\n`;
+  });
+  downloadCSV(csv, `full_transaction_log_${dateStamp()}.csv`);
+}
+
+function downloadCSV(content, filename){
+  const blob = new Blob([content], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Utils ---------- */
+function csvSafe(v){
+  v = (v===undefined||v===null) ? '' : String(v);
+  if(v.includes(',') || v.includes('"') || v.includes('\n')){
+    v = '"' + v.replace(/"/g,'""') + '"';
+  }
+  return v;
+}
+function dateStamp(){ return new Date().toISOString().slice(0,10); }
+function formatTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleString();
+}
+function escapeHtml(s){
+  return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s).replace(/'/g, "\\'"); }
+
+/* init rates if not present */
+loadRates();
+</script>
+
+</body>
+</html>
