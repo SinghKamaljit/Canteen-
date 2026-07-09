@@ -439,21 +439,32 @@ function buildGridTiles(W, H, n, overlapFrac){
 // Tries the whole photo first, then progressively finer overlapping
 // tiles — so a small QR sitting inside a wider photo of the card
 // (any corner, any distance) still gets found.
-function scanImageForQR(img){
-  const full = imageToCanvas(img);
+//
+// Everything is tiled from a single resolution-capped "working" canvas
+// rather than the photo's native resolution. Phone camera photos can be
+// 3000-4000px+ on the long side; repeatedly cropping up to ~29 tiles
+// straight out of a canvas that large puts real memory pressure on a
+// mobile browser and was the likely cause of gallery scans failing/
+// erroring partway through. Capping once up front keeps every tile
+// small and fast without losing the resolution needed to read a QR.
+const GALLERY_SCAN_WORKING_DIM = 1800;
 
-  let text = decodeCanvasForQR(capResolution(full, 1600));
+function scanImageForQR(img){
+  const native = imageToCanvas(img);
+  const working = capResolution(native, GALLERY_SCAN_WORKING_DIM);
+
+  let text = decodeCanvasForQR(working);
   if(text) return text;
 
-  text = decodeCanvasForQR(capResolution(full, 900));
+  text = decodeCanvasForQR(capResolution(working, 900));
   if(text) return text;
 
   for(const n of [2, 3, 4]){
-    const tiles = buildGridTiles(full.width, full.height, n, 0.2);
+    const tiles = buildGridTiles(working.width, working.height, n, 0.2);
     for(const t of tiles){
       if(t.w < 60 || t.h < 60) continue;
-      const tile = cropCanvas(full, t.x, t.y, t.w, t.h);
-      text = decodeCanvasForQR(capResolution(tile, 1200));
+      const tile = cropCanvas(working, t.x, t.y, t.w, t.h);
+      text = decodeCanvasForQR(tile);
       if(text) return text;
     }
   }
@@ -478,11 +489,14 @@ function handleGalleryImage(event){
       // synchronous tiled search runs and blocks the main thread.
       setTimeout(function(){
         let text = null;
+        let scanErr = null;
         try{ text = scanImageForQR(img); }
-        catch(err){ /* fall through to not-found message */ }
+        catch(err){ scanErr = err; }
         statusEl.textContent = '';
         if(text){
           handleScanResult(text);
+        } else if(scanErr){
+          showBanner('Scan error: ' + scanErr.message + '. Try a smaller/clearer photo of the card.', 'err');
         } else {
           showBanner('No QR code found, even after checking the full photo and multiple zoomed-in regions. Try a straighter, closer, glare-free photo.', 'err');
         }
