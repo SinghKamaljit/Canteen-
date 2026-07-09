@@ -190,7 +190,11 @@
 
   <div class="panel">
     <h2>Find Member</h2>
-    <button class="btn gold" id="scanBtn" onclick="toggleScanner()">Start Camera Scan</button>
+    <div class="row" style="margin-top:0;">
+      <button class="btn gold" id="scanBtn" onclick="toggleScanner()" style="margin-top:0;">Start Camera Scan</button>
+      <button class="btn secondary" onclick="document.getElementById('galleryInput').click()" style="margin-top:0;">🖼️ From Gallery</button>
+    </div>
+    <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="handleGalleryImage(event)">
     <video id="video" playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
     <div class="scan-status" id="scanStatus"></div>
@@ -351,7 +355,7 @@ function scanLoop(){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
     if(code && code.data){
       handleScanResult(code.data);
       stopScanner();
@@ -372,6 +376,123 @@ function handleScanResult(text){
     return;
   }
   loadOrCreateMember(mno, name, phone);
+}
+
+/* ---------- Gallery image scan (useful for testing on a single phone,
+   or the occasional case of scanning a screenshot/photo of a card
+   sent to a staff member for a discounted/free item) ---------- */
+
+function imageToCanvas(img){
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return c;
+}
+
+function cropCanvas(srcCanvas, x, y, w, h){
+  const c = document.createElement('canvas');
+  c.width = Math.round(w);
+  c.height = Math.round(h);
+  c.getContext('2d').drawImage(srcCanvas, x, y, w, h, 0, 0, c.width, c.height);
+  return c;
+}
+
+// Caps a canvas to a max side length so per-tile decode stays fast,
+// without losing enough resolution to read the QR's modules.
+function capResolution(canvas, maxDim){
+  const largest = Math.max(canvas.width, canvas.height);
+  if(largest <= maxDim) return canvas;
+  const scale = maxDim / largest;
+  const c = document.createElement('canvas');
+  c.width = Math.round(canvas.width * scale);
+  c.height = Math.round(canvas.height * scale);
+  c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+  return c;
+}
+
+function decodeCanvasForQR(canvas){
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const result = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+  return result && result.data ? result.data : null;
+}
+
+// Builds an NxN grid of overlapping tile rectangles covering W x H.
+function buildGridTiles(W, H, n, overlapFrac){
+  const baseW = W / n, baseH = H / n;
+  const tw = Math.min(W, baseW * (1 + overlapFrac));
+  const th = Math.min(H, baseH * (1 + overlapFrac));
+  const tiles = [];
+  for(let iy = 0; iy < n; iy++){
+    for(let ix = 0; ix < n; ix++){
+      let x = ix * baseW - (tw - baseW) / 2;
+      let y = iy * baseH - (th - baseH) / 2;
+      x = Math.max(0, Math.min(W - tw, x));
+      y = Math.max(0, Math.min(H - th, y));
+      tiles.push({x, y, w: tw, h: th});
+    }
+  }
+  return tiles;
+}
+
+// Tries the whole photo first, then progressively finer overlapping
+// tiles — so a small QR sitting inside a wider photo of the card
+// (any corner, any distance) still gets found.
+function scanImageForQR(img){
+  const full = imageToCanvas(img);
+
+  let text = decodeCanvasForQR(capResolution(full, 1600));
+  if(text) return text;
+
+  text = decodeCanvasForQR(capResolution(full, 900));
+  if(text) return text;
+
+  for(const n of [2, 3, 4]){
+    const tiles = buildGridTiles(full.width, full.height, n, 0.2);
+    for(const t of tiles){
+      if(t.w < 60 || t.h < 60) continue;
+      const tile = cropCanvas(full, t.x, t.y, t.w, t.h);
+      text = decodeCanvasForQR(capResolution(tile, 1200));
+      if(text) return text;
+    }
+  }
+  return null;
+}
+
+function handleGalleryImage(event){
+  const file = event.target.files[0];
+  event.target.value = ''; // allow re-selecting the same file later
+  if(!file) return;
+
+  if(scanning) stopScanner();
+
+  const statusEl = document.getElementById('scanStatus');
+  statusEl.textContent = '🔍 Scanning image for the QR code — checking full photo and zoomed-in regions, this can take a few seconds…';
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      // Let the "scanning…" message actually paint before the
+      // synchronous tiled search runs and blocks the main thread.
+      setTimeout(function(){
+        let text = null;
+        try{ text = scanImageForQR(img); }
+        catch(err){ /* fall through to not-found message */ }
+        statusEl.textContent = '';
+        if(text){
+          handleScanResult(text);
+        } else {
+          showBanner('No QR code found, even after checking the full photo and multiple zoomed-in regions. Try a straighter, closer, glare-free photo.', 'err');
+        }
+      }, 30);
+    };
+    img.onerror = function(){ statusEl.textContent=''; showBanner('Could not read that image file.', 'err'); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function(){ statusEl.textContent=''; showBanner('Could not read that image file.', 'err'); };
+  reader.readAsDataURL(file);
 }
 
 /* ---------- Manual entry ---------- */
